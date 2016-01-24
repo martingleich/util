@@ -238,31 +238,33 @@ Suite::Suite(Environment& env, const Info& info) :
 
 bool Suite::Run(SuiteResult& result)
 {
-	if(!ExecFunction(m_Init))
-		return false;
-
+	bool procceed;
+	if(!ExecFunction(m_Init, procceed))
+		return procceed;
+	
 	for(auto it = m_Tests.begin(); it != m_Tests.end(); ++it) {
+		
 		GetEnvironment()->GetControl()->OnTestBegin(**it);
 		TestResult testResult(*it);
 		do {
 			testResult = TestResult(*it);
-			if(!ExecFunction(m_Enter))
-				return false;
+			if(!ExecFunction(m_Enter, procceed))
+				return procceed;
 		
 			bool procceed = (*it)->Run(testResult);
 			if(!procceed)
-				return false;
+				return procceed;
 
-			if(!ExecFunction(m_Leave))
-				return false;
+			if(!ExecFunction(m_Leave, procceed))
+				return procceed;
 
 		} while(GetEnvironment()->GetControl()->OnTestEnd(testResult));
 
 		result.AddResult(testResult);
 	}
 
-	if(!ExecFunction(m_Exit))
-		return false;
+	if(!ExecFunction(m_Exit, procceed))
+		return procceed;
 
 	return true;
 }
@@ -302,7 +304,7 @@ void Suite::RegisterDependency(const std::string& name)
 	m_Dependencies.push_back(name);		
 }
 
-bool Suite::ExecFunction(const SuiteFunction& func)
+bool Suite::ExecFunction(const SuiteFunction& func, bool& procceed)
 {
 	try {
 		func();
@@ -311,10 +313,13 @@ bool Suite::ExecFunction(const SuiteFunction& func)
 				m_Info.env->GetControl()->OnException(func.GetInfo());
 		 if(action == ControlAction::Ignore || action == ControlAction::Procceed)
 			 (void)0;
-		 else if(action == ControlAction::AbortCurrent)
-			 return true;
-		 else
+		 else if(action == ControlAction::AbortCurrent) {
+			 procceed = true;
 			 return false;
+		 } else {
+			 procceed = false;
+			 return false;
+		 }
 	}
 
 	return true;
@@ -493,18 +498,19 @@ bool Environment::RunSuites(const std::vector<Suite*>& suites,
 	for(auto it = suites.begin(); it != suites.end(); ++it) {
 		bool procceed = true;
 
+		SuiteResult suiteResult(*it);
 		GetControl()->OnSuiteBegin(**it);
 
 		if(CheckDependencies(*it, result, procceed)) {
-			SuiteResult suiteResult(*it);
-
-			bool abort = (*it)->Run(suiteResult);
+			bool succe = (*it)->Run(suiteResult);
 			if(!abort)
 				procceed = false;
-
-			GetControl()->OnSuiteEnd(suiteResult);
-			result.AddResult(suiteResult);
+		} else {
+			suiteResult.SetTotalResult(Result::Unknown);
 		}
+
+		GetControl()->OnSuiteEnd(suiteResult);
+		result.AddResult(suiteResult);
 
 		if(!procceed)
 			return false;
