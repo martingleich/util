@@ -243,7 +243,6 @@ bool Suite::Run(SuiteResult& result)
 		return procceed;
 	
 	for(auto it = m_Tests.begin(); it != m_Tests.end(); ++it) {
-		
 		GetEnvironment()->GetControl()->OnTestBegin(**it);
 		TestResult testResult(*it);
 		do {
@@ -251,7 +250,7 @@ bool Suite::Run(SuiteResult& result)
 			if(!ExecFunction(m_Enter, procceed))
 				return procceed;
 		
-			bool procceed = (*it)->Run(testResult);
+			procceed = (*it)->Run(testResult);
 			if(!procceed)
 				return procceed;
 
