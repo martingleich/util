@@ -135,6 +135,12 @@ public:
 	Result GetTotalResult() const;
 	const Suite* GetSuite() const;
 
+	void SetTotalResult(Result result)
+	{
+		m_Results.clear();
+		m_TotalResult = result;
+	}
+
 private:
 	Suite* m_Suite;
 	std::vector<TestResult> m_Results;
@@ -183,7 +189,7 @@ private:
 	void RegisterTest(Test* t);
 	void RegisterDependency(const std::string& name);
 	void AddTag(const std::string& tag);
-	bool ExecFunction(const SuiteFunction& func);
+	bool ExecFunction(const SuiteFunction& func, bool& procceed);
 
 private:
 	SuiteFunction m_Init;
@@ -383,19 +389,19 @@ public:
 	virtual ControlAction OnException(const Info& ctx)
 	{
 		std::cout << "Unknown exception was thrown." << std::endl;
-		return ControlAction::Abort;
+		return ControlAction::AbortCurrent;
 	}
     virtual ControlAction OnDependencyFail(const Suite& running,
 			const Suite& failed, const SuiteResult& result)
     {
         std::cout << "   Dependency \"" << failed.GetInfo().name <<
 				"\" needed by \"" << running.GetInfo().name << "\" failed." << std::endl;
-		return ControlAction::Abort;
+		return ControlAction::AbortCurrent;
     }
     virtual ControlAction OnUnknownDependency(const Suite& s, const std::string& dep)
     {
         std::cout << "   Missing dependency \"" << dep << "\"." << std::endl;
-		return ControlAction::Abort;
+		return ControlAction::AbortCurrent;
     }
     virtual ControlAction OnUnsolvableDependencies(const Environment& e)
     {
