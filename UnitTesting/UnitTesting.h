@@ -81,12 +81,11 @@ struct AssertResult
 class TestContext
 {
 public:
-	TestContext(TestResult& r, Test& t);
+	TestContext(TestResult& r);
 	void AddResult(const Info& info, bool result, const std::string& msg);
 
 private:
 	TestResult& m_Results;
-	Test& m_Test;
 };
 
 class TestResult
@@ -222,7 +221,7 @@ public:
 	static Environment& Instance();
 
 	size_t GetSuiteCount() const;
-	const Suite* GetSuite() const;
+	const Suite* GetSuite(size_t i) const;
 
 	void SetControl(ControlCallback* control);
 	ControlCallback* GetControl() const;
@@ -236,9 +235,11 @@ private:
 	void RegisterSuite(Suite* suite);
 
 private:
-	bool CheckDependencies(const Suite* s, EnvironmentResult& result, bool& Procceed);
+	bool CheckDependencies(const Suite* s, 
+			EnvironmentResult& result, bool& Procceed);
 	bool RunSuites(const std::vector<Suite*>& suites, EnvironmentResult& result);
-	bool TopoVisit(size_t cur, std::vector<Suite*>& result, std::vector<bool>& mark, std::vector<bool>& tempMark);
+	bool TopoVisit(size_t cur, std::vector<Suite*>& result, 
+			std::vector<bool>& mark, std::vector<bool>& tempMark);
 	bool SolveDependencies(std::vector<Suite*>& result);
 	bool AllowSuite(const Suite* s) const;
 
@@ -312,7 +313,8 @@ public:
 	virtual void OnEnd(const EnvironmentResult& result) {}
 
 	virtual ControlAction OnException(const Info& ctx) = 0;
-	virtual ControlAction OnDependencyFail(const Suite& running, const Suite& failed, const SuiteResult& result) = 0;
+	virtual ControlAction OnDependencyFail(const Suite& running,
+			const Suite& failed, const SuiteResult& result) = 0;
 	virtual ControlAction OnUnknownDependency(const Suite& from, const std::string& name) = 0;
 	virtual ControlAction OnUnsolvableDependencies(const Environment& env) = 0;
 };
@@ -383,9 +385,11 @@ public:
 		std::cout << "Unknown exception was thrown." << std::endl;
 		return ControlAction::Abort;
 	}
-    virtual ControlAction OnDependencyFail(const Suite& running, const Suite& failed, const SuiteResult& result)
+    virtual ControlAction OnDependencyFail(const Suite& running,
+			const Suite& failed, const SuiteResult& result)
     {
-        std::cout << "   Dependency \"" << failed.GetInfo().name << "\" needed by \"" << running.GetInfo().name << "\" failed." << std::endl;
+        std::cout << "   Dependency \"" << failed.GetInfo().name <<
+				"\" needed by \"" << running.GetInfo().name << "\" failed." << std::endl;
 		return ControlAction::Abort;
     }
     virtual ControlAction OnUnknownDependency(const Suite& s, const std::string& dep)

@@ -1,6 +1,5 @@
 #include "UnitTesting.h"
 #include <ctime>
-#include <iostream>
 
 #define USE_PERFORMANCE_COUNTER_WIN32
 
@@ -60,19 +59,19 @@ LARGE_INTEGER Timer::PERFORMANCE_FREQ;
 namespace UnitTesting
 {
 
-TestContext::TestContext(TestResult& r, Test& t) :
-	m_Results(r), m_Test(t)
+TestContext::TestContext(TestResult& r) :
+	m_Results(r)
 {}
 
 void TestContext::AddResult(const Info& info,
 		bool result, const std::string& msg)
 {
 	Info i = info;
-	i.test = &m_Test;
+	i.test = m_Results.GetTest();
 	i.suite = i.test->GetSuite();
 	i.env = i.suite->GetEnvironment();
 	AssertResult assertResult(info, result?Result::Success:Result::Fail, msg);
-	m_Test.GetSuite()->GetEnvironment()->GetControl()->OnAssert(assertResult);
+	i.test->GetSuite()->GetEnvironment()->GetControl()->OnAssert(assertResult);
 	m_Results.AddResult(assertResult);
 }
 
@@ -138,7 +137,7 @@ Test::Test(Suite& s, TestFunction func, const Info& info) :
 
 bool Test::Run(TestResult& result)
 {
-	TestContext ctx(result, *this);
+	TestContext ctx(result);
 	try {
 		Timer::timeType begin = Timer::GetTime();
 		m_Func(ctx);
@@ -308,7 +307,8 @@ bool Suite::ExecFunction(const SuiteFunction& func)
 	try {
 		func();
 	} catch(...) {
-		 ControlAction action = m_Info.env->GetControl()->OnException(func.GetInfo());
+		 ControlAction action = 
+				m_Info.env->GetControl()->OnException(func.GetInfo());
 		 if(action == ControlAction::Ignore || action == ControlAction::Procceed)
 			 (void)0;
 		 else if(action == ControlAction::AbortCurrent)
@@ -440,14 +440,12 @@ void Environment::RemoveFilter(Filter* filter)
 
 bool Environment::AllowSuite(const Suite* s) const
 {
-	bool result = true;
 	for(auto it = m_Filter.begin(); it != m_Filter.end(); ++it) {
-		result &= (*it)->IsOK(*s);
-		if(!result)
-			break;
+		if(!(*it)->IsOK(*s))
+			return false;
 	}
 
-	return result;
+	return true;
 }
 
 size_t Environment::GetSuiteCount() const
@@ -455,9 +453,9 @@ size_t Environment::GetSuiteCount() const
 	return m_Suites.size();
 }
 
-const Suite* Environment::GetSuite() const
+const Suite* Environment::GetSuite(size_t i) const
 {
-	return m_Suites[0];
+	return m_Suites[i];
 }
 
 void Environment::RegisterSuite(Suite* suite)
@@ -466,12 +464,14 @@ void Environment::RegisterSuite(Suite* suite)
 	m_Suites.push_back(suite);
 }
 
-bool Environment::CheckDependencies(const Suite* s, EnvironmentResult& result, bool& Procceed)
+bool Environment::CheckDependencies(const Suite* s,
+		EnvironmentResult& result, bool& Procceed)
 {
 	for(size_t i = 0; i != s->GetDependencyCount(); ++i){
 		const SuiteResult& suiteRes = result.GetResult(s->GetDependency(i));
 		if(suiteRes.GetTotalResult() != Result::Success) {
-			ControlAction action = GetControl()->OnDependencyFail(*s, *suiteRes.GetSuite(), suiteRes);
+			ControlAction action = GetControl()->OnDependencyFail(
+					*s, *suiteRes.GetSuite(), suiteRes);
 			if(action == ControlAction::Ignore) {
 				(void)0;
 			} else if(action == ControlAction::AbortCurrent) {
@@ -487,7 +487,8 @@ bool Environment::CheckDependencies(const Suite* s, EnvironmentResult& result, b
 	return true;
 }
 
-bool Environment::RunSuites(const std::vector<Suite*>& suites, EnvironmentResult& result)
+bool Environment::RunSuites(const std::vector<Suite*>& suites,
+		EnvironmentResult& result)
 {
 	for(auto it = suites.begin(); it != suites.end(); ++it) {
 		bool procceed = true;
@@ -507,13 +508,13 @@ bool Environment::RunSuites(const std::vector<Suite*>& suites, EnvironmentResult
 
 		if(!procceed)
 			return false;
-
 	}
 
 	return true;
 }
 
-bool Environment::TopoVisit(size_t cur, std::vector<Suite*>& result, std::vector<bool>& mark, std::vector<bool>& tempMark)
+bool Environment::TopoVisit(size_t cur, std::vector<Suite*>& result,
+		std::vector<bool>& mark, std::vector<bool>& tempMark)
 {
 	if(tempMark[cur])
 		return false;
@@ -527,7 +528,8 @@ bool Environment::TopoVisit(size_t cur, std::vector<Suite*>& result, std::vector
 			const std::string& depName = m_Suites[cur]->GetDependency(j);
 			auto dep = m_SuiteMap.find(depName);
 			if(dep == m_SuiteMap.end()) {
-				ControlAction action = GetControl()->OnUnknownDependency(*m_Suites[cur], depName);
+				ControlAction action = GetControl()->OnUnknownDependency(
+						*m_Suites[cur], depName);
 				if(action == ControlAction::Ignore)
 					(void)0;
 				else
@@ -553,10 +555,7 @@ bool Environment::SolveDependencies(std::vector<Suite*>& result)
 
 	bool succeded = true;
 	for(size_t i = 0; i < m_Suites.size(); ++i) {
-		if(!mark[i]) {
-			if(!AllowSuite(m_Suites[i]))
-				continue;
-
+		if(!mark[i] && AllowSuite(m_Suites[i])) {
 			succeded = TopoVisit(i, result, mark, tempMark);
 			if(!succeded)
 				break;
