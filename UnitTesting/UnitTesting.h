@@ -27,22 +27,8 @@ struct Info
 	std::string file;
 	int line;
 
-	Info() :
-		env(nullptr),
-		suite(nullptr),
-		test(nullptr),
-		name(""),
-		file(""),
-		line(0)
-	{}
-	Info(const std::string& n, const std::string& f, int l) :
-		env(nullptr),
-		suite(nullptr),
-		test(nullptr),
-		name(n),
-		file(f),
-		line(l)
-	{}
+	Info();
+	Info(const std::string& name, const std::string& file, int line);
 };
 
 enum class Result
@@ -67,15 +53,8 @@ struct AssertResult
 	std::string message;
 	Info info;
 
-	AssertResult() :
-		result(Result::Unknown)
-	{}
-
-	AssertResult(const Info& inf, Result res, const std::string& msg) :
-		result(res),
-		message(msg),
-		info(inf)
-	{}
+	AssertResult();
+	AssertResult(const Info& inf, Result res, const std::string& msg);
 };
 
 class TestContext
@@ -134,12 +113,7 @@ public:
 	const TestResult& GetResult(size_t i) const;
 	Result GetTotalResult() const;
 	const Suite* GetSuite() const;
-
-	void SetTotalResult(Result result)
-	{
-		m_Results.clear();
-		m_TotalResult = result;
-	}
+	void SetTotalResult(Result result);
 
 private:
 	Suite* m_Suite;
@@ -321,15 +295,16 @@ public:
 	virtual ControlAction OnException(const Info& ctx) = 0;
 	virtual ControlAction OnDependencyFail(const Suite& running,
 			const Suite& failed, const SuiteResult& result) = 0;
-	virtual ControlAction OnUnknownDependency(const Suite& from, const std::string& name) = 0;
+	virtual ControlAction OnUnknownDependency(
+			const Suite& from, const std::string& name) = 0;
 	virtual ControlAction OnUnsolvableDependencies(const Environment& env) = 0;
 };
 
 class Filter
 {
 public:
-	virtual bool IsOK(const Suite& suite) = 0;;
-	virtual bool IsOK(const Test& test) = 0;;
+	virtual bool IsOK(const Suite& suite) = 0;
+	virtual bool IsOK(const Test& test) = 0;
 };
 
 class ConsoleCallback : public ControlCallback
@@ -380,77 +355,75 @@ public:
 	}
 
 	virtual void OnBegin(Environment& env)
-	{
-	}
+	{}
 	virtual void OnEnd(const Environment& env)
-	{
-	}
+	{}
 
 	virtual ControlAction OnException(const Info& ctx)
 	{
 		std::cout << "Unknown exception was thrown." << std::endl;
 		return ControlAction::AbortCurrent;
 	}
-    virtual ControlAction OnDependencyFail(const Suite& running,
-			const Suite& failed, const SuiteResult& result)
-    {
-        std::cout << "   Dependency \"" << failed.GetInfo().name <<
-				"\" needed by \"" << running.GetInfo().name << "\" failed." << std::endl;
+	virtual ControlAction OnDependencyFail(const Suite& running,
+		const Suite& failed, const SuiteResult& result)
+	{
+		std::cout << "   Dependency \"" << failed.GetInfo().name <<
+			"\" needed by \"" << running.GetInfo().name << "\" failed." << std::endl;
 		return ControlAction::AbortCurrent;
-    }
-    virtual ControlAction OnUnknownDependency(const Suite& s, const std::string& dep)
-    {
-        std::cout << "   Missing dependency \"" << dep << "\"." << std::endl;
+	}
+	virtual ControlAction OnUnknownDependency(const Suite& s, const std::string& dep)
+	{
+		std::cout << "   Missing dependency \"" << dep << "\"." << std::endl;
 		return ControlAction::AbortCurrent;
-    }
-    virtual ControlAction OnUnsolvableDependencies(const Environment& e)
-    {
-        std::cout << "Can not solve dependencies." << std::endl;
+	}
+	virtual ControlAction OnUnsolvableDependencies(const Environment& e)
+	{
+		std::cout << "Can not solve dependencies." << std::endl;
 		return ControlAction::Abort;
-    }
+	}
 };
 
 }
 
-#define UNIT_SUITE(name)\
-namespace Suite_##name\
-{\
-static UnitTesting::Suite Suite(UnitTesting::Environment::Instance(), UnitTesting::Info(#name, __FILE__, __LINE__));\
-}\
-namespace Suite_##name\
+#define UNIT_SUITE(name) \
+namespace Suite_##name \
+{ \
+static UnitTesting::Suite Suite(UnitTesting::Environment::Instance(), UnitTesting::Info(#name, __FILE__, __LINE__)); \
+} \
+namespace Suite_##name
 
-#define UNIT_SUITE_DEPEND_ON(dependency)\
+#define UNIT_SUITE_DEPEND_ON(dependency) \
 static UnitTesting::RegisterDependency RegisterSuiteDepend_##dependency(Suite, #dependency);
 
-#define UNIT_SUITE_TAG(tag)\
+#define UNIT_SUITE_TAG(tag) \
 static UnitTesting::AddTag AddTag_##tag(Suite, #tag);
 
-#define UNIT_TEST(name)\
-void TestFunc_##name(UnitTesting::TestContext&);\
-static UnitTesting::Test Test_##name(Suite, &TestFunc_##name, UnitTesting::Info(#name, __FILE__, __LINE__));\
-void TestFunc_##name(UnitTesting::TestContext& ctx)\
+#define UNIT_TEST(name) \
+void TestFunc_##name(UnitTesting::TestContext&); \
+static UnitTesting::Test Test_##name(Suite, &TestFunc_##name, UnitTesting::Info(#name, __FILE__, __LINE__)); \
+void TestFunc_##name(UnitTesting::TestContext& ctx)
 
 #define UNIT_SUITE_INIT \
-void SuiteInitFunc();\
-static UnitTesting::RegisterInit RegisterSuiteInit(Suite, &SuiteInitFunc, UnitTesting::Info("suite.init", __FILE__, __LINE__));\
+void SuiteInitFunc(); \
+static UnitTesting::RegisterInit RegisterSuiteInit(Suite, &SuiteInitFunc, UnitTesting::Info("suite.init", __FILE__, __LINE__)); \
 void SuiteInitFunc()
 
 #define UNIT_SUITE_EXIT \
-void SuiteExit();\
-static UnitTesting::RegisterExit RegisterSuiteExit(Suite, &SuiteExit, UnitTesting::Info("suite.exit", __FILE__, __LINE__));\
+void SuiteExit(); \
+static UnitTesting::RegisterExit RegisterSuiteExit(Suite, &SuiteExit, UnitTesting::Info("suite.exit", __FILE__, __LINE__)); \
 void SuiteExit()
 
 #define UNIT_SUITE_FIXTURE_ENTER \
-void SuiteFixtureEnter();\
-static UnitTesting::RegisterFixtureEnter RegisterFixtureEnter(Suite, &SuiteFixtureEnter, UnitTesting::Info("suite.fixture_enter", __FILE__, __LINE__));\
+void SuiteFixtureEnter(); \
+static UnitTesting::RegisterFixtureEnter RegisterFixtureEnter(Suite, &SuiteFixtureEnter, UnitTesting::Info("suite.fixture_enter", __FILE__, __LINE__)); \
 void SuiteFixtureEnter()
 
 #define UNIT_SUITE_FIXTURE_LEAVE \
-void SuiteFixtureLeave();\
-static UnitTesting::RegisterFixtureLeave RegisterFixtureLeave(Suite, &SuiteFixtureLeave, UnitTesting::Info("suite.fixture_leave", __FILE__, __LINE__));\
+void SuiteFixtureLeave(); \
+static UnitTesting::RegisterFixtureLeave RegisterFixtureLeave(Suite, &SuiteFixtureLeave, UnitTesting::Info("suite.fixture_leave", __FILE__, __LINE__)); \
 void SuiteFixtureLeave()
 
-#define UNIT_ASSERT(cond) do{ ctx.AddResult(UnitTesting::Info("", __FILE__, __LINE__), cond, #cond); }while(false)
-#define UNIT_ASSERT_EX(cond, msg) do{ ctx.AddResult(UnitTesting::Info("", __FILE__, __LINE__), cond, msg); }while(false)
+#define UNIT_ASSERT(cond) do{ ctx.AddResult(UnitTesting::Info("", __FILE__, __LINE__), (cond), #cond); }while(false)
+#define UNIT_ASSERT_EX(cond, msg) do{ ctx.AddResult(UnitTesting::Info("", __FILE__, __LINE__), (cond), (msg)); }while(false)
 
 #endif

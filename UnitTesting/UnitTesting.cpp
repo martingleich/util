@@ -59,6 +59,40 @@ LARGE_INTEGER Timer::PERFORMANCE_FREQ;
 namespace UnitTesting
 {
 
+///////////////////////////////////////////////////////////////////////////////
+
+Info::Info() :
+	env(nullptr),
+	suite(nullptr),
+	test(nullptr),
+	name(""),
+	file(""),
+	line(0)
+{}
+
+Info::Info(const std::string& n, const std::string& f, int l) :
+	env(nullptr),
+	suite(nullptr),
+	test(nullptr),
+	name(n),
+	file(f),
+	line(l)
+{}
+
+///////////////////////////////////////////////////////////////////////////////
+
+AssertResult::AssertResult() :
+	result(Result::Unknown)
+{}
+
+AssertResult::AssertResult(const Info& inf, Result res, const std::string& msg) :
+	result(res),
+	message(msg),
+	info(inf)
+{}
+
+///////////////////////////////////////////////////////////////////////////////
+
 TestContext::TestContext(TestResult& r) :
 	m_Results(r)
 {}
@@ -144,7 +178,8 @@ bool Test::Run(TestResult& result)
 		Timer::timeType end = Timer::GetTime();
 		result.SetTime((end-begin)/(Timer::GetTicksPerSecond()*1000.0));
 	} catch(...) {
-		ControlCallback* callback = m_Info.suite->GetEnvironment()->GetControl();
+		ControlCallback* callback =
+				m_Info.suite->GetEnvironment()->GetControl();
 		ControlAction action = callback->OnException(GetInfo());
 		if(action == ControlAction::Abort)
 			return false;
@@ -207,9 +242,17 @@ const Suite* SuiteResult::GetSuite() const
 	return m_Suite;
 }
 
+void SuiteResult::SetTotalResult(Result result)
+{
+	m_Results.clear();
+	m_TotalResult = result;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
-SuiteFunction::SuiteFunction() {}
+SuiteFunction::SuiteFunction() :
+	m_Func(nullptr)
+{}
 
 SuiteFunction::SuiteFunction(void(*f)(), const Info& info) :
 	m_Func(f), m_Info(info)
@@ -331,7 +374,7 @@ const Info& Suite::GetInfo() const
 
 bool Suite::CheckTag(const std::string& tag) const
 {
-	return m_Tags.find(tag) != m_Tags.end();
+	return (m_Tags.find(tag) != m_Tags.end());
 }
 
 void Suite::RegisterInit(void (*func)(), Info info)
