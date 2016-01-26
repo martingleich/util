@@ -1,60 +1,5 @@
 #include "UnitTesting.h"
-#include <ctime>
-
-#define USE_PERFORMANCE_COUNTER_WIN32
-
-#ifdef USE_PERFORMANCE_COUNTER_WIN32
-#include <Windows.h>
-#endif
-
-class Timer
-{
-public:
-	typedef unsigned long long timeType;
-public:
-
-#ifdef USE_PERFORMANCE_COUNTER_WIN32
-	static LARGE_INTEGER PERFORMANCE_FREQ;
-	Timer()
-	{
-		if(!QueryPerformanceFrequency(&PERFORMANCE_FREQ))
-			PERFORMANCE_FREQ.QuadPart = 0;
-	}
-
-	static timeType GetTime()
-	{
-		if(PERFORMANCE_FREQ.QuadPart == 0)
-			return std::clock();
-
-		LARGE_INTEGER time;
-		QueryPerformanceCounter(&time);
-
-		return time.QuadPart;
-	}
-
-	static unsigned long long GetTicksPerSecond()
-	{
-		if(PERFORMANCE_FREQ.QuadPart == 0)
-			return CLOCKS_PER_SEC;
-		return PERFORMANCE_FREQ.QuadPart;
-	}
-#else
-	static timeType GetTime()
-	{
-		std::clock_t t = std::clock();
-		return t;
-	}
-
-	static unsigned long long GetTicksPerSecond()
-	{
-		return CLOCKS_PER_SEC;
-	}
-#endif
-};
-
-#ifdef USE_PERFORMANCE_COUNTER_WIN32
-LARGE_INTEGER Timer::PERFORMANCE_FREQ;
-#endif
+#include <chrono>
 
 namespace UnitTesting
 {
@@ -173,10 +118,13 @@ bool Test::Run(TestResult& result)
 {
 	TestContext ctx(result);
 	try {
-		Timer::timeType begin = Timer::GetTime();
+		std::chrono::high_resolution_clock clock;
+		auto begin = clock.now();
 		m_Func(ctx);
-		Timer::timeType end = Timer::GetTime();
-		result.SetTime((end-begin)/(Timer::GetTicksPerSecond()*1000.0));
+		auto end = clock.now();
+		std::chrono::duration<double, std::ratio<1, 1000>> elapsedMillis = end - begin;
+
+		result.SetTime(elapsedMillis.count());
 	} catch(...) {
 		ControlCallback* callback =
 				m_Info.suite->GetEnvironment()->GetControl();
