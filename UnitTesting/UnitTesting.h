@@ -19,16 +19,21 @@ typedef void (*TestFunction)(TestContext&);
 
 struct Info
 {
+	Info();
+	Info(const std::string& name, const std::string& file, int line);
+
+	const std::string& GetName() const;
+	const std::string& GetFile() const;
+	int GetLine() const;
+
 	const Environment* env;
 	const Suite* suite;
 	const Test* test;
 
-	std::string name;
-	std::string file;
-	int line;
-
-	Info();
-	Info(const std::string& name, const std::string& file, int line);
+private:
+	std::string m_Name;
+	std::string m_File;
+	int m_Line;
 };
 
 enum class Result
@@ -78,7 +83,7 @@ public:
 	Result GetTotalResult() const;
 	size_t GetAssertCount() const;
 	const AssertResult& GetAssert(size_t i) const;
-	const Test* GetTest() const;
+	const Test& GetTest() const;
 	double GetMilliseconds() const;
 
 private:
@@ -94,7 +99,7 @@ friend class Suite;
 public:
 	Test(Suite& s, TestFunction func, const Info& info);
 	const Info& GetInfo() const;
-	const Suite* GetSuite() const;
+	const Suite& GetSuite() const;
 
 private:
 	bool Run(TestResult& result);
@@ -112,7 +117,7 @@ public:
 	size_t GetResultCount() const;
 	const TestResult& GetResult(size_t i) const;
 	Result GetTotalResult() const;
-	const Suite* GetSuite() const;
+	const Suite& GetSuite() const;
 	void SetTotalResult(Result result);
 
 private:
@@ -148,9 +153,9 @@ public:
 	Suite(Environment& env, const Info& info);
 	const std::string& GetDependency(int i) const;
 	size_t GetDependencyCount() const;
-	const Test* GetTest(int i) const;
+	const Test& GetTest(int i) const;
 	size_t GetTestCount() const;
-	const Environment* GetEnvironment() const;
+	const Environment& GetEnvironment() const;
 	const Info& GetInfo() const;
 	bool CheckTag(const std::string& tag) const;
 
@@ -186,7 +191,7 @@ public:
 	size_t GetResultCount() const;
 	const SuiteResult& GetResult(size_t i) const;
 	const SuiteResult& GetResult(const std::string& name) const;
-	const Environment* GetEnvironment() const;
+	const Environment& GetEnvironment() const;
 
 private:
 	Environment* m_Environment;
@@ -201,7 +206,7 @@ public:
 	static Environment& Instance();
 
 	size_t GetSuiteCount() const;
-	const Suite* GetSuite(size_t i) const;
+	const Suite& GetSuite(size_t i) const;
 
 	void SetControl(ControlCallback* control);
 	ControlCallback* GetControl() const;
@@ -314,7 +319,7 @@ public:
 
 	virtual void OnTestBegin(Test& t)
 	{		
-		std::cout << "   " << t.GetInfo().name << " --> ";
+		std::cout << "   " << t.GetInfo().GetName() << " --> ";
 	}
 
 	virtual bool OnTestEnd(const TestResult& t)
@@ -346,7 +351,7 @@ public:
 
 	virtual void OnSuiteBegin(Suite& s)
 	{
-		std::cout << "Run Testsuite \"" << s.GetInfo().name << "\":" << std::endl;
+		std::cout << "Run Testsuite \"" << s.GetInfo().GetName() << "\":" << std::endl;
 	}
 
 	virtual void OnSuiteEnd(const SuiteResult& result)
@@ -367,8 +372,8 @@ public:
 	virtual ControlAction OnDependencyFail(const Suite& running,
 		const Suite& failed, const SuiteResult& result)
 	{
-		std::cout << "   Dependency \"" << failed.GetInfo().name <<
-			"\" needed by \"" << running.GetInfo().name << "\" failed." << std::endl;
+		std::cout << "   Dependency \"" << failed.GetInfo().GetName() <<
+			"\" needed by \"" << running.GetInfo().GetName() << "\" failed." << std::endl;
 		return ControlAction::AbortCurrent;
 	}
 	virtual ControlAction OnUnknownDependency(const Suite& s, const std::string& dep)
@@ -400,30 +405,30 @@ static UnitTesting::AddTag AddTag_##tag(Suite, #tag);
 
 #define UNIT_TEST(name) \
 void TestFunc_##name(UnitTesting::TestContext&); \
-static UnitTesting::Test Test_##name(Suite, &TestFunc_##name, UnitTesting::Info(#name, __FILE__, __LINE__)); \
+static UnitTesting::Test Test_##name(Suite, &TestFunc_##name, UnitTesting::Info(#name, "", __LINE__)); \
 void TestFunc_##name(UnitTesting::TestContext& ctx)
 
 #define UNIT_SUITE_INIT \
 void SuiteInitFunc(); \
-static UnitTesting::RegisterInit RegisterSuiteInit(Suite, &SuiteInitFunc, UnitTesting::Info("suite.init", __FILE__, __LINE__)); \
+static UnitTesting::RegisterInit RegisterSuiteInit(Suite, &SuiteInitFunc, UnitTesting::Info("suite.init", "", __LINE__)); \
 void SuiteInitFunc()
 
 #define UNIT_SUITE_EXIT \
 void SuiteExit(); \
-static UnitTesting::RegisterExit RegisterSuiteExit(Suite, &SuiteExit, UnitTesting::Info("suite.exit", __FILE__, __LINE__)); \
+static UnitTesting::RegisterExit RegisterSuiteExit(Suite, &SuiteExit, UnitTesting::Info("suite.exit", "", __LINE__)); \
 void SuiteExit()
 
 #define UNIT_SUITE_FIXTURE_ENTER \
 void SuiteFixtureEnter(); \
-static UnitTesting::RegisterFixtureEnter RegisterFixtureEnter(Suite, &SuiteFixtureEnter, UnitTesting::Info("suite.fixture_enter", __FILE__, __LINE__)); \
+static UnitTesting::RegisterFixtureEnter RegisterFixtureEnter(Suite, &SuiteFixtureEnter, UnitTesting::Info("suite.fixture_enter", "", __LINE__)); \
 void SuiteFixtureEnter()
 
 #define UNIT_SUITE_FIXTURE_LEAVE \
 void SuiteFixtureLeave(); \
-static UnitTesting::RegisterFixtureLeave RegisterFixtureLeave(Suite, &SuiteFixtureLeave, UnitTesting::Info("suite.fixture_leave", __FILE__, __LINE__)); \
+static UnitTesting::RegisterFixtureLeave RegisterFixtureLeave(Suite, &SuiteFixtureLeave, UnitTesting::Info("suite.fixture_leave", "", __LINE__)); \
 void SuiteFixtureLeave()
 
-#define UNIT_ASSERT(cond) do{ ctx.AddResult(UnitTesting::Info("", __FILE__, __LINE__), (cond), #cond); }while(false)
-#define UNIT_ASSERT_EX(cond, msg) do{ ctx.AddResult(UnitTesting::Info("", __FILE__, __LINE__), (cond), (msg)); }while(false)
+#define UNIT_ASSERT(cond) do{ ctx.AddResult(UnitTesting::Info("", "", __LINE__), (cond), #cond); }while(false)
+#define UNIT_ASSERT_EX(cond, msg) do{ ctx.AddResult(UnitTesting::Info("", "", __LINE__), (cond), (msg)); }while(false)
 
 #endif
