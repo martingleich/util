@@ -6,6 +6,23 @@ namespace UnitTesting
 
 ///////////////////////////////////////////////////////////////////////////////
 
+ResultObject::ResultObject() :
+	m_TotalResult(Result::Success)
+{}
+
+Result ResultObject::GetTotalResult() const
+{
+	return m_TotalResult;
+}
+
+void ResultObject::AddResult(Result result)
+{
+	if(m_TotalResult != Result::Fail && result != Result::Success)
+		m_TotalResult = result;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 Info::Info() :
 	env(nullptr),
 	suite(nullptr),
@@ -46,16 +63,16 @@ int Info::GetLine() const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-AssertResult::AssertResult() :
-	result(Result::Unknown)
+AssertResult::AssertResult()
 {}
 
 AssertResult::AssertResult(
 		const Info& inf, Result res, const std::string& msg) :
-	result(res),
 	message(msg),
 	info(inf)
-{}
+{
+	ResultObject::AddResult(res);
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -79,20 +96,13 @@ void TestContext::AddResult(const Info& info,
 
 TestResult::TestResult(Test* test) :
 	m_Test(test),
-	m_TotalResult(Result::Success),
 	m_Milliseconds(0)
 {}
 
 void TestResult::AddResult(const AssertResult& result)
 {
 	m_Results.push_back(result);
-	if(m_TotalResult != Result::Fail && result.result != Result::Success)
-		m_TotalResult = result.result;
-}
-
-Result TestResult::GetTotalResult() const
-{
-	return m_TotalResult;
+	ResultObject::AddResult(result.GetTotalResult());
 }
 
 size_t TestResult::GetAssertCount() const
@@ -174,16 +184,13 @@ const Suite& Test::GetSuite() const
 ///////////////////////////////////////////////////////////////////////////////
 
 SuiteResult::SuiteResult(Suite* suite) :
-	m_Suite(suite),
-	m_TotalResult(Result::Success)
+	m_Suite(suite)
 {}
 
 void SuiteResult::AddResult(const TestResult& result)
 {
 	m_Results.push_back(result);
-	if(m_TotalResult != Result::Fail &&
-			result.GetTotalResult() != Result::Success)
-		m_TotalResult = result.GetTotalResult();
+	ResultObject::AddResult(result.GetTotalResult());
 }
 
 size_t SuiteResult::GetResultCount() const
@@ -196,9 +203,15 @@ const TestResult& SuiteResult::GetResult(size_t i) const
 	return m_Results[i];
 }
 
-Result SuiteResult::GetTotalResult() const
+const TestResult& SuiteResult::GetResult(const std::string& name) const
 {
-	return m_TotalResult;
+	for(auto it = m_Results.begin(); it != m_Results.end(); ++it) {
+		if(it->GetTest().GetInfo().GetName() == name)
+			return *it;
+	}
+
+	static TestResult NULL_Result(nullptr);
+	return NULL_Result;
 }
 
 const Suite& SuiteResult::GetSuite() const
@@ -208,7 +221,6 @@ const Suite& SuiteResult::GetSuite() const
 
 void SuiteResult::SetTotalResult(Result result)
 {
-	m_Results.clear();
 	m_TotalResult = result;
 }
 
@@ -383,6 +395,7 @@ EnvironmentResult::EnvironmentResult(Environment* env) :
 void EnvironmentResult::AddResult(const SuiteResult& result)
 {
 	m_Results.push_back(result);
+	ResultObject::AddResult(result.GetTotalResult());
 }
 
 size_t EnvironmentResult::GetResultCount() const
@@ -476,10 +489,13 @@ void Environment::RegisterSuite(Suite* suite)
 }
 
 bool Environment::CheckDependencies(const Suite* s,
-		EnvironmentResult& result, bool& Procceed)
+		EnvironmentResult& result, bool& Procceed,
+		std::vector<size_t>& resultConnector)
 {
 	for(size_t i = 0; i != s->GetDependencyCount(); ++i){
-		const SuiteResult& suiteRes = result.GetResult(s->GetDependency(i));
+		size_t suiteID = m_SuiteMap[s->GetDependency(i)];
+		size_t resultID = resultConnector[suiteID];
+		const SuiteResult& suiteRes = result.GetResult(resultID);
 		if(suiteRes.GetTotalResult() != Result::Success) {
 			ControlAction action = GetControl()->OnDependencyFail(
 					*s, suiteRes.GetSuite(), suiteRes);
@@ -501,13 +517,15 @@ bool Environment::CheckDependencies(const Suite* s,
 bool Environment::RunSuites(const std::vector<Suite*>& suites,
 		EnvironmentResult& result)
 {
+	std::vector<size_t> resultConnector(m_Suites.size());
+
 	for(auto it = suites.begin(); it != suites.end(); ++it) {
 		bool procceed = true;
 
 		SuiteResult suiteResult(*it);
 		GetControl()->OnSuiteBegin(**it);
 
-		if(CheckDependencies(*it, result, procceed)) {
+		if(CheckDependencies(*it, result, procceed, resultConnector)) {
 			if(!(*it)->Run(suiteResult))
 				procceed = false;
 		} else {
@@ -515,6 +533,11 @@ bool Environment::RunSuites(const std::vector<Suite*>& suites,
 		}
 
 		GetControl()->OnSuiteEnd(suiteResult);
+		
+		size_t suiteID = m_SuiteMap[(*it)->GetInfo().GetName()];
+		size_t resultID = result.GetResultCount();
+		resultConnector[suiteID] = resultID;
+
 		result.AddResult(suiteResult);
 
 		if(!procceed)

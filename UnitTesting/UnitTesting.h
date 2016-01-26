@@ -8,6 +8,7 @@
 
 namespace UnitTesting
 {
+
 class Environment;
 class Suite;
 class Test;
@@ -52,9 +53,21 @@ enum class ControlAction
 	Repeat
 };
 
-struct AssertResult
+class ResultObject
 {
-	Result result;
+public:
+	ResultObject();
+	Result GetTotalResult() const;
+
+protected:
+	void AddResult(Result result);
+
+protected:
+	Result m_TotalResult;
+};
+
+struct AssertResult : public ResultObject
+{
 	std::string message;
 	Info info;
 
@@ -72,7 +85,7 @@ private:
 	TestResult& m_Results;
 };
 
-class TestResult
+class TestResult : public ResultObject
 {
 public:
 	TestResult(Test* test);
@@ -80,7 +93,6 @@ public:
 	void AddResult(const AssertResult& result);
 	void SetTime(double t);
 
-	Result GetTotalResult() const;
 	size_t GetAssertCount() const;
 	const AssertResult& GetAssert(size_t i) const;
 	const Test& GetTest() const;
@@ -89,7 +101,6 @@ public:
 private:
 	Test* m_Test;
 	std::vector<AssertResult> m_Results;
-	Result m_TotalResult;
 	double m_Milliseconds;
 };
 
@@ -109,21 +120,20 @@ private:
 	Info m_Info;
 };
 
-class SuiteResult
+class SuiteResult : public ResultObject
 {
 public:
 	SuiteResult(Suite* suite);
 	void AddResult(const TestResult& result);
 	size_t GetResultCount() const;
 	const TestResult& GetResult(size_t i) const;
-	Result GetTotalResult() const;
+	const TestResult& GetResult(const std::string& name) const;
 	const Suite& GetSuite() const;
 	void SetTotalResult(Result result);
 
 private:
 	Suite* m_Suite;
 	std::vector<TestResult> m_Results;
-	Result m_TotalResult;
 };
 
 class SuiteFunction
@@ -183,7 +193,7 @@ private:
 	std::set<std::string> m_Tags;
 };
 
-class EnvironmentResult
+class EnvironmentResult : public ResultObject
 {
 public:
 	EnvironmentResult(Environment* env);
@@ -194,6 +204,7 @@ public:
 	const Environment& GetEnvironment() const;
 
 private:
+	Result m_TotalResult;
 	Environment* m_Environment;
 	std::vector<SuiteResult> m_Results;
 };
@@ -221,7 +232,8 @@ private:
 
 private:
 	bool CheckDependencies(const Suite* s, 
-			EnvironmentResult& result, bool& Procceed);
+			EnvironmentResult& result, bool& Procceed,
+			std::vector<size_t>& resultConnector);
 	bool RunSuites(const std::vector<Suite*>& suites, EnvironmentResult& result);
 	bool TopoVisit(size_t cur, std::vector<Suite*>& result, 
 			std::vector<bool>& mark, std::vector<bool>& tempMark);
@@ -337,9 +349,9 @@ public:
 			{
 				const AssertResult& a = t.GetAssert(i);
 				std::cout << "     \"" << a.message << "\" --> ";
-				if(a.result == Result::Success)
+				if(a.GetTotalResult() == Result::Success)
 					std::cout << "Succeeded";
-				else if(a.result == Result::Fail)
+				else if(a.GetTotalResult() == Result::Fail)
 					std::cout << "Failed";
 
 				std::cout << std::endl;
