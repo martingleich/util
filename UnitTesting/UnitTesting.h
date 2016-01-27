@@ -234,8 +234,9 @@ private:
 			EnvironmentResult& result, bool& Procceed,
 			const std::vector<size_t>& resultConnector);
 	bool RunSuites(const std::vector<Suite*>& suites, EnvironmentResult& result);
-	bool TopoVisit(size_t cur, std::vector<Suite*>& result, 
-			std::vector<bool>& mark, std::vector<bool>& tempMark);
+	int TopoVisit(size_t cur, std::vector<Suite*>& result, 
+			std::vector<std::pair<bool, bool>>& mark,
+			std::vector<const Suite*>& unsolvable);
 	bool SolveDependencies(std::vector<Suite*>& result);
 	bool AllowSuite(const Suite* s) const;
 
@@ -313,7 +314,8 @@ public:
 			const Suite& failed, const SuiteResult& result) = 0;
 	virtual ControlAction OnUnknownDependency(
 			const Suite& from, const std::string& name) = 0;
-	virtual ControlAction OnUnsolvableDependencies(const Environment& env) = 0;
+	virtual ControlAction OnUnsolvableDependencies(
+			const Environment& env, const std::vector<const Suite*>& unsolvable) = 0;
 };
 
 class Filter
@@ -381,20 +383,25 @@ public:
 		return ControlAction::AbortCurrent;
 	}
 	virtual ControlAction OnDependencyFail(const Suite& running,
-		const Suite& failed, const SuiteResult& result)
+			const Suite& failed, const SuiteResult& result)
 	{
-		std::cout << "   Dependency \"" << failed.GetInfo().GetName() <<
+		std::cout << "Dependency \"" << failed.GetInfo().GetName() <<
 			"\" needed by \"" << running.GetInfo().GetName() << "\" failed." << std::endl;
 		return ControlAction::AbortCurrent;
 	}
-	virtual ControlAction OnUnknownDependency(const Suite& s, const std::string& dep)
+	virtual ControlAction OnUnknownDependency(
+			const Suite& s, const std::string& dep)
 	{
-		std::cout << "   Missing dependency \"" << dep << "\"." << std::endl;
+		std::cout << "Missing dependency \"" << dep << "\"." << std::endl;
 		return ControlAction::AbortCurrent;
 	}
-	virtual ControlAction OnUnsolvableDependencies(const Environment& e)
+	virtual ControlAction OnUnsolvableDependencies(
+			const Environment& e, const std::vector<const Suite*>& unsolvable)
 	{
-		std::cout << "Can not solve dependencies." << std::endl;
+		std::cout << "Can not solve dependencies, circle by:" << std::endl;
+		for(auto it = unsolvable.begin(); it != unsolvable.end(); ++it)
+			std::cout << "   " << (*it)->GetInfo().GetName() << std::endl;
+
 		return ControlAction::Abort;
 	}
 };

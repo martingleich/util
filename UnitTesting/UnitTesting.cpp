@@ -546,18 +546,19 @@ bool Environment::RunSuites(const std::vector<Suite*>& suites,
 	return true;
 }
 
-bool Environment::TopoVisit(size_t cur, std::vector<Suite*>& result,
-		std::vector<bool>& mark, std::vector<bool>& tempMark)
+int Environment::TopoVisit(size_t cur, std::vector<Suite*>& result,
+		std::vector<std::pair<bool, bool>>& mark,
+		std::vector<const Suite*>& unsolvable)
 {
-	if(tempMark[cur])
-		return false;
+	if(mark[cur].second)
+		return 1;
 
-	if(mark[cur])
+	if(mark[cur].first)
 		return true;
 
-	tempMark[cur] = true;
+	mark[cur].second = true;
 	for(size_t j = 0; j < m_Suites[cur]->GetDependencyCount(); ++j) {
-		if(!mark[cur]) {
+		if(!mark[cur].first) {
 			const std::string& depName = m_Suites[cur]->GetDependency(j);
 			auto dep = m_SuiteMap.find(depName);
 			if(dep == m_SuiteMap.end()) {
@@ -566,37 +567,45 @@ bool Environment::TopoVisit(size_t cur, std::vector<Suite*>& result,
 				if(action == ControlAction::Ignore)
 					(void)0;
 				else
-					return false;
+					return 2;
 			}
 
-			if(!TopoVisit(dep->second, result, mark, tempMark))
-				return false;
+			int visitResult = TopoVisit(dep->second, result, mark, unsolvable);
+			if(!visitResult) {
+				if(visitResult == 1)
+					unsolvable.push_back(m_Suites[dep->second]);
+				return visitResult;
+			}
 		}
 	}
 
-	mark[cur] = true;
-	tempMark[cur] = false;
+	mark[cur].first = true;
+	mark[cur].second = false;
 	result.push_back(m_Suites[cur]);
 
-	return true;
+	return 0;
 }
 
 bool Environment::SolveDependencies(std::vector<Suite*>& result)
 {
-	std::vector<bool> mark(m_Suites.size(), false);
-	std::vector<bool> tempMark(m_Suites.size(), false);
+	std::vector<std::pair<bool, bool>> mark(m_Suites.size(),
+			std::pair<bool,bool>(false, false));
+	std::vector<const Suite*> unsolvable;
 
 	bool succeded = true;
 	for(size_t i = 0; i < m_Suites.size(); ++i) {
-		if(!mark[i] && AllowSuite(m_Suites[i])) {
-			succeded = TopoVisit(i, result, mark, tempMark);
+		if(!mark[i].first && AllowSuite(m_Suites[i])) {
+			succeded = (TopoVisit(i, result, mark, unsolvable) == 0);
 			if(!succeded)
 				break;
 		}
 	}
 
-	if(!succeded)
+	if(!succeded) {
 		result.clear();
+		if(!unsolvable.empty())
+			GetControl()->OnUnsolvableDependencies(*this, unsolvable);
+	}
 
 	return succeded;
 }
@@ -615,8 +624,6 @@ void Environment::Run()
 		GetControl()->OnBegin(*this);
 		RunSuites(performSuites, result);
 		GetControl()->OnEnd(result);
-	} else {
-		GetControl()->OnUnsolvableDependencies(*this);
 	}
 
 	if(m_Callback == &fallbackCallback)
