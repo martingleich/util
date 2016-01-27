@@ -275,7 +275,6 @@ bool Suite::Run(SuiteResult& result)
 
 			if(!ExecFunction(m_Leave, procceed))
 				return procceed;
-
 		} while(GetEnvironment().GetControl()->OnTestEnd(testResult));
 
 		result.AddResult(testResult);
@@ -490,7 +489,7 @@ void Environment::RegisterSuite(Suite* suite)
 
 bool Environment::CheckDependencies(const Suite* s,
 		EnvironmentResult& result, bool& Procceed,
-		std::vector<size_t>& resultConnector)
+		const std::vector<size_t>& resultConnector)
 {
 	for(size_t i = 0; i != s->GetDependencyCount(); ++i){
 		size_t suiteID = m_SuiteMap[s->GetDependency(i)];
@@ -519,7 +518,7 @@ bool Environment::RunSuites(const std::vector<Suite*>& suites,
 {
 	std::vector<size_t> resultConnector(m_Suites.size());
 
-	for(auto it = suites.begin(); it != suites.end(); ++it) {
+	for(auto it= suites.begin(); it != suites.end(); ++it) {
 		bool procceed = true;
 
 		SuiteResult suiteResult(*it);

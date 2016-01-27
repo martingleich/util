@@ -204,7 +204,6 @@ public:
 	const Environment& GetEnvironment() const;
 
 private:
-	Result m_TotalResult;
 	Environment* m_Environment;
 	std::vector<SuiteResult> m_Results;
 };
@@ -233,7 +232,7 @@ private:
 private:
 	bool CheckDependencies(const Suite* s, 
 			EnvironmentResult& result, bool& Procceed,
-			std::vector<size_t>& resultConnector);
+			const std::vector<size_t>& resultConnector);
 	bool RunSuites(const std::vector<Suite*>& suites, EnvironmentResult& result);
 	bool TopoVisit(size_t cur, std::vector<Suite*>& result, 
 			std::vector<bool>& mark, std::vector<bool>& tempMark);
