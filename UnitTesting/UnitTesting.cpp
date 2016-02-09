@@ -554,7 +554,7 @@ int Environment::TopoVisit(size_t cur, std::vector<Suite*>& result,
 		return 1;
 
 	if(mark[cur].first)
-		return true;
+		return 0;
 
 	mark[cur].second = true;
 	for(size_t j = 0; j < m_Suites[cur]->GetDependencyCount(); ++j) {
@@ -571,7 +571,7 @@ int Environment::TopoVisit(size_t cur, std::vector<Suite*>& result,
 			}
 
 			int visitResult = TopoVisit(dep->second, result, mark, unsolvable);
-			if(!visitResult) {
+			if(visitResult) {
 				if(visitResult == 1)
 					unsolvable.push_back(m_Suites[dep->second]);
 				return visitResult;
